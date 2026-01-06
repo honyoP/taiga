@@ -2,6 +2,7 @@
 name = "taiga"
 version = "0.1.0"
 authors = ["Tadeas Tran"]
+license= "MIT"
 edition = "2024"
 
 [package.metadata.taiga]
