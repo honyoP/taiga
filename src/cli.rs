@@ -77,7 +77,9 @@ pub fn cli() -> Command {
                 Arg::new("ID")
                     .help("Task ID to be removed")
                     .action(ArgAction::Set)
-                    .num_args(1..),
+                    .num_args(1..)
+                    .required(true)
+                    .value_parser(clap::value_parser!(u32)),
             ),
         )
 }
