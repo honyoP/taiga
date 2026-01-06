@@ -13,7 +13,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg: config::Config = confy::load("taiga", None)?;
     let mut tasks_file_path = PathBuf::from(&cfg.data_directory);
     tasks_file_path.push(&cfg.task_filename);
-    println!("task path: {}", tasks_file_path.to_string_lossy());
     let mut repo = TaskRepository::load_from_file(&tasks_file_path)?;
 
     let matches = cli::cli().get_matches();
