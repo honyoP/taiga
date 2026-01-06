@@ -512,7 +512,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "taiginator"
+name = "taiga"
 version = "0.1.0"
 dependencies = [
  "chrono",

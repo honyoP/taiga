@@ -1,2 +1,3 @@
-# taiginator
+# taiga
+
 A CLI task manager

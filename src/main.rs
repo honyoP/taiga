@@ -8,7 +8,7 @@ mod config;
 mod task;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cfg: config::Config = confy::load("taiginator", None)?;
+    let cfg: config::Config = confy::load("taiga", None)?;
     let mut task_path = PathBuf::from(&cfg.data_directory);
     task_path.push(&cfg.task_filename);
     println!("task path: {}", task_path.to_string_lossy());

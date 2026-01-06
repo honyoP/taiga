@@ -1,4 +1,4 @@
-use clap::{Arg, ArgAction, Command, Parser, Subcommand, arg};
+use clap::{Arg, ArgAction, Command, Parser, Subcommand};
 
 /// Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
@@ -20,7 +20,7 @@ pub enum Commands {
 }
 
 pub fn cli() -> Command {
-    Command::new("taiginator")
+    Command::new("taiga")
         .about("A task organizer from a mentally deficit monkey")
         .subcommand_required(true)
         .arg_required_else_help(true)
