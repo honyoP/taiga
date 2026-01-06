@@ -1,7 +1,11 @@
 [package]
 name = "taiga"
 version = "0.1.0"
+authors = ["Tadeas Tran"]
 edition = "2024"
+
+[package.metadata.taiga]
+codename = "YATTA (Yet Another Terminal Task App)"
 
 [dependencies]
 clap = { version = "4.5.54", features = ["derive"]}
@@ -12,3 +16,7 @@ serde_json = "1.0.148"
 dirs = "6.0.0"
 chrono = { version="0.4.42", features = ["serde"] }
 chrono-english = "0.1.8"
+
+[build-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+toml = "0.9"

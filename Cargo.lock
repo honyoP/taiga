@@ -543,6 +543,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "toml",
 ]
 
 [[package]]

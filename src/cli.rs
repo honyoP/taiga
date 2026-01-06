@@ -22,6 +22,13 @@ pub enum Commands {
 pub fn cli() -> Command {
     Command::new("taiga")
         .about("A task organizer from a mentally deficit monkey")
+        .version(env!("CARGO_PKG_VERSION"))
+        .long_version(concat!(
+            "v",
+            env!("CARGO_PKG_VERSION"),
+            "\nCodeName: ",
+            env!("CODENAME")
+        ))
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(
