@@ -68,8 +68,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             match repo.get_mut(id) {
                 Some(task) => {
-                    task.is_complete = true;
-                    println!("Marked task #{} as done: {}", task.id, task.title);
+                    if task.is_complete {
+                        task.is_complete = false;
+                        println!("Marked task #{} as open: {}", task.id, task.title);
+                    } else {
+                        task.is_complete = true;
+                        println!("Marked task #{} as done: {}", task.id, task.title);
+                    }
 
                     repo.save_to_file(&tasks_file_path)?;
                 }
