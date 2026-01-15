@@ -1,8 +1,8 @@
 use crate::ipc::{DaemonCommand, DaemonResponse, get_socket_path};
-use interprocess::local_socket::traits::tokio::{Listener as _, Stream as _};
+use interprocess::local_socket::traits::tokio::Listener as _;
 use interprocess::local_socket::{
     GenericFilePath, GenericNamespaced, ListenerOptions, ToFsName, ToNsName,
-    tokio::{Listener, Stream as LocalSocketStream},
+    tokio::Stream as LocalSocketStream,
 };
 use notify_rust::Notification;
 use std::error::Error;
@@ -32,14 +32,12 @@ pub async fn run_daemon() -> Result<(), Box<dyn Error>> {
     let socket_path = get_socket_path();
 
     // Clean up old socket file (Linux/Mac)
-    if !cfg!(windows) {
-        if std::fs::metadata(&socket_path).is_ok() {
-            println!("Removing old socket file...");
-            std::fs::remove_file(&socket_path).ok();
-        }
+    if !cfg!(windows) && std::fs::metadata(&socket_path).is_ok() {
+        println!("Removing old socket file...");
+        std::fs::remove_file(&socket_path).ok();
     }
 
-    let mut listener = if cfg!(windows) {
+    let listener = if cfg!(windows) {
         let name = socket_path.as_str().to_ns_name::<GenericNamespaced>()?;
         ListenerOptions::new().name(name).create_tokio()?
     } else {
@@ -64,11 +62,9 @@ pub async fn run_daemon() -> Result<(), Box<dyn Error>> {
         tokio::select! {
             _ = interval.tick() => {
                 let mut locked_state = state.lock().await;
-                if let Some(end_time) = locked_state.end_time {
-                    if Instant::now() >= end_time {
+                if let Some(end_time) = locked_state.end_time && Instant::now() >= end_time {
                         handle_timer_transition(&mut locked_state);
                     }
-                }
             }
 
             result = listener.accept() => {

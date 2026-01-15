@@ -130,23 +130,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("{:?}", resp);
                 }
                 // TODO: Prettify all Pomo outputs
-                Some(("status", status_matches)) => {
+                Some(("status", _status_matches)) => {
                     let resp = client::send_command(ipc::DaemonCommand::Status).await?;
                     println!("{:?}", resp);
                 }
-                Some(("stop", stop_matches)) => {
+                Some(("stop", _stop_matches)) => {
                     client::send_command(ipc::DaemonCommand::Stop).await?;
                     println!("Timer stopped.");
                 }
-                Some(("pause", pause_matches)) => {
+                Some(("pause", _pause_matches)) => {
                     let resp = client::send_command(ipc::DaemonCommand::Pause).await?;
                     println!("{:?}", resp);
                 }
-                Some(("resume", resume_matches)) => {
+                Some(("resume", _resume_matches)) => {
                     let resp = client::send_command(ipc::DaemonCommand::Resume).await?;
                     println!("{:?}", resp);
                 }
-                Some(("kill", kill_matches)) => {
+                Some(("kill", _kill_matches)) => {
                     let resp = client::send_command(ipc::DaemonCommand::Kill).await?;
                     println!("{:?}", resp);
                 }
