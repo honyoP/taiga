@@ -1,3 +1,4 @@
+use crate::error::{Result, TaigaError};
 use crate::ipc::{DaemonCommand, DaemonResponse, get_socket_path};
 use interprocess::local_socket::traits::tokio::Listener as _;
 use interprocess::local_socket::{
@@ -5,7 +6,6 @@ use interprocess::local_socket::{
     tokio::Stream as LocalSocketStream,
 };
 use notify_rust::Notification;
-use std::error::Error;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
@@ -16,7 +16,6 @@ struct TimerConfig {
     break_duration: Duration,
 }
 
-// The Internal State of the Daemon
 struct TimerState {
     mode: crate::ipc::PomoMode,
     end_time: Option<Instant>,
@@ -26,23 +25,34 @@ struct TimerState {
     paused_duration: Option<Duration>,
 }
 
-pub async fn run_daemon() -> Result<(), Box<dyn Error>> {
+pub async fn run_daemon() -> Result<()> {
     println!("Daemon starting...");
 
     let socket_path = get_socket_path();
 
-    // Clean up old socket file (Linux/Mac)
     if !cfg!(windows) && std::fs::metadata(&socket_path).is_ok() {
         println!("Removing old socket file...");
         std::fs::remove_file(&socket_path).ok();
     }
 
     let listener = if cfg!(windows) {
-        let name = socket_path.as_str().to_ns_name::<GenericNamespaced>()?;
-        ListenerOptions::new().name(name).create_tokio()?
+        let name = socket_path
+            .as_str()
+            .to_ns_name::<GenericNamespaced>()
+            .map_err(|e| TaigaError::Ipc(e.to_string()))?;
+        ListenerOptions::new()
+            .name(name)
+            .create_tokio()
+            .map_err(|e| TaigaError::Daemon(e.to_string()))?
     } else {
-        let name = socket_path.as_str().to_fs_name::<GenericFilePath>()?;
-        ListenerOptions::new().name(name).create_tokio()?
+        let name = socket_path
+            .as_str()
+            .to_fs_name::<GenericFilePath>()
+            .map_err(|e| TaigaError::Ipc(e.to_string()))?;
+        ListenerOptions::new()
+            .name(name)
+            .create_tokio()
+            .map_err(|e| TaigaError::Daemon(e.to_string()))?
     };
 
     println!("Daemon listening at: {}", socket_path);
@@ -87,7 +97,7 @@ pub async fn run_daemon() -> Result<(), Box<dyn Error>> {
 async fn handle_connection(
     stream: &mut LocalSocketStream,
     state: Arc<Mutex<TimerState>>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let mut buffer = [0; 1024];
     let n = stream.read(&mut buffer).await?;
 
@@ -101,7 +111,7 @@ async fn handle_connection(
         let mut locked = state.lock().await;
         match req {
             DaemonCommand::Start {
-                task_id: _, // You might want to store this in state if you track specific tasks
+                task_id: _,
                 focus_len,
                 break_len,
                 cycles,
@@ -135,7 +145,7 @@ async fn handle_connection(
                     DaemonResponse::Status {
                         remaining_secs: rem,
                         is_running: true,
-                        mode: locked.mode, // Now returns "Focus" or "Break"
+                        mode: locked.mode,
                         cycles_left: locked.cycles_remaining,
                         task_id: locked.task_id,
                     }
@@ -143,7 +153,7 @@ async fn handle_connection(
                     DaemonResponse::Status {
                         remaining_secs: dur.as_secs(),
                         is_running: false,
-                        mode: locked.mode, // Returns mode even while paused
+                        mode: locked.mode,
                         cycles_left: locked.cycles_remaining,
                         task_id: locked.task_id,
                     }
@@ -195,7 +205,7 @@ async fn handle_connection(
 }
 
 fn handle_timer_transition(state: &mut TimerState) {
-    let config = state.config.as_ref().unwrap(); // Should exist if running
+    let config = state.config.as_ref().unwrap();
 
     match state.mode {
         crate::ipc::PomoMode::Focus => {

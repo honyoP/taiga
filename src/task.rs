@@ -5,6 +5,14 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::sync::LazyLock;
+
+use crate::error::{Result, TaigaError};
+
+static TASK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\[ID:(\d+)\] - \[(.)\] (.*?)(?: \(Scheduled: (.*)\))?$")
+        .expect("Invalid regex pattern")
+});
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Task {
@@ -43,24 +51,29 @@ impl Task {
         }
     }
 
-    pub fn from_md_line(line: &str) -> Option<Self> {
-        // Regex Breakdown:
-        // ^\[ID:(\d+)\]      -> Starts with [ID:digits], capture digits (Group 1)
-        // \s-\s              -> " - " separator
-        // \[(.)\]            -> [x] or [ ], capture the character (Group 2)
-        // \s                 -> space
-        // (.*?)              -> Capture the Title lazy (Group 3)
-        // (?:\s\(Scheduled:\s(.*)\))?$ -> Optional Non-capturing group for schedule. Capture date (Group 4)
+    pub fn from_md_line(line: &str) -> Result<Self> {
+        let caps = TASK_REGEX
+            .captures(line)
+            .ok_or_else(|| TaigaError::Parse(format!("Invalid task format: {}", line)))?;
 
-        let re = Regex::new(r"^\[ID:(\d+)\] - \[(.)\] (.*?)(?: \(Scheduled: (.*)\))?$").unwrap();
+        let id = caps
+            .get(1)
+            .ok_or_else(|| TaigaError::Parse("Missing task ID".to_string()))?
+            .as_str()
+            .parse::<u32>()
+            .map_err(|e| TaigaError::Parse(format!("Invalid task ID: {}", e)))?;
 
-        let caps = re.captures(line)?;
+        let is_complete = caps
+            .get(2)
+            .ok_or_else(|| TaigaError::Parse("Missing completion status".to_string()))?
+            .as_str()
+            == "x";
 
-        let id = caps.get(1)?.as_str().parse::<u32>().ok()?;
-
-        let is_complete = caps.get(2)?.as_str() == "x";
-
-        let title = caps.get(3)?.as_str().to_string();
+        let title = caps
+            .get(3)
+            .ok_or_else(|| TaigaError::Parse("Missing task title".to_string()))?
+            .as_str()
+            .to_string();
 
         let scheduled = match caps.get(4) {
             Some(m) => {
@@ -73,7 +86,7 @@ impl Task {
             None => None,
         };
 
-        Some(Task {
+        Ok(Task {
             id,
             title,
             is_complete,
@@ -128,9 +141,7 @@ impl TaskRepository {
         list
     }
 
-    pub fn load_from_file(
-        file_path: &PathBuf,
-    ) -> Result<TaskRepository, Box<dyn std::error::Error>> {
+    pub fn load_from_file(file_path: &PathBuf) -> Result<TaskRepository> {
         let mut repo = TaskRepository::new();
 
         if !file_path.exists() {
@@ -146,22 +157,27 @@ impl TaskRepository {
                 continue;
             }
 
-            if let Some(task) = Task::from_md_line(&line) {
-                if task.id >= repo.next_id {
-                    repo.next_id = task.id + 1;
+            match Task::from_md_line(&line) {
+                Ok(task) => {
+                    if task.id >= repo.next_id {
+                        repo.next_id = task.id + 1;
+                    }
+                    repo.tasks.insert(task.id, task);
                 }
-                repo.tasks.insert(task.id, task);
+                Err(e) => {
+                    eprintln!("Warning: Skipping invalid task line: {}", e);
+                }
             }
         }
 
         Ok(repo)
     }
 
-    pub fn save_to_file(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_to_file(&self, path: &PathBuf) -> Result<()> {
         let mut file = OpenOptions::new()
             .write(true)
             .create(true)
-            .truncate(true) // Overwrite file
+            .truncate(true)
             .open(path)?;
 
         for task in self.list_all() {
