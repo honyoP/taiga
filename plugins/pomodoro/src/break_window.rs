@@ -49,6 +49,9 @@ struct BreakWindowApp {
     start_time: Instant,
     state: Arc<BreakWindowState>,
     sound_played_at_end: bool,
+    is_paused: bool,
+    paused_at: Option<Instant>,
+    total_paused_duration: Duration,
 }
 
 impl BreakWindowApp {
@@ -66,16 +69,46 @@ impl BreakWindowApp {
             start_time: Instant::now(),
             state,
             sound_played_at_end: false,
+            is_paused: false,
+            paused_at: None,
+            total_paused_duration: Duration::ZERO,
         }
     }
 
     fn remaining_secs(&self) -> u64 {
-        let elapsed = self.start_time.elapsed().as_secs();
-        self.config.duration_secs.saturating_sub(elapsed)
+        // Calculate elapsed time, excluding paused duration
+        let total_elapsed = self.start_time.elapsed();
+
+        // If currently paused, don't count time since pause started
+        let current_pause_duration = if let Some(paused_at) = self.paused_at {
+            paused_at.elapsed()
+        } else {
+            Duration::ZERO
+        };
+
+        let effective_elapsed = total_elapsed
+            .saturating_sub(self.total_paused_duration)
+            .saturating_sub(current_pause_duration);
+
+        self.config.duration_secs.saturating_sub(effective_elapsed.as_secs())
     }
 
     fn is_break_over(&self) -> bool {
-        self.remaining_secs() == 0
+        !self.is_paused && self.remaining_secs() == 0
+    }
+
+    fn toggle_pause(&mut self) {
+        if self.is_paused {
+            // Resume: add the paused duration to total
+            if let Some(paused_at) = self.paused_at.take() {
+                self.total_paused_duration += paused_at.elapsed();
+            }
+            self.is_paused = false;
+        } else {
+            // Pause: record when we paused
+            self.paused_at = Some(Instant::now());
+            self.is_paused = true;
+        }
     }
 
     fn format_time(secs: u64) -> String {
@@ -125,8 +158,12 @@ impl eframe::App for BreakWindowApp {
             return;
         }
 
-        // Update window title with time
-        let title = format!("Break Time - {}", Self::format_time(remaining));
+        // Update window title with time and pause status
+        let title = if self.is_paused {
+            format!("Break Time - {} (PAUSED)", Self::format_time(remaining))
+        } else {
+            format!("Break Time - {}", Self::format_time(remaining))
+        };
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
 
         // Main UI
@@ -148,30 +185,53 @@ impl eframe::App for BreakWindowApp {
 
                 ui.add_space(5.0);
 
-                // Main message
-                ui.label(egui::RichText::new("Take a break!").size(self.ui_settings.message_font_size));
+                // Main message - changes when paused
+                let message = if self.is_paused {
+                    "Break paused"
+                } else {
+                    "Take a break!"
+                };
+                ui.label(egui::RichText::new(message).size(self.ui_settings.message_font_size));
 
                 ui.add_space(10.0);
 
                 // Countdown timer - large and prominent
-                let [r, g, b] = self.ui_settings.timer_color;
+                // Show in different color when paused
+                let timer_color = if self.is_paused {
+                    egui::Color32::from_rgb(150, 150, 150) // Gray when paused
+                } else {
+                    let [r, g, b] = self.ui_settings.timer_color;
+                    egui::Color32::from_rgb(r, g, b)
+                };
                 ui.label(
                     egui::RichText::new(Self::format_time(remaining))
                         .size(self.ui_settings.countdown_font_size)
                         .strong()
-                        .color(egui::Color32::from_rgb(r, g, b)),
+                        .color(timer_color),
                 );
 
                 ui.add_space(5.0);
-                ui.label("remaining");
+                let status_text = if self.is_paused { "paused" } else { "remaining" };
+                ui.label(status_text);
 
                 ui.add_space(15.0);
 
-                // Skip break button
-                if ui.button("Skip Break").clicked() {
-                    self.state.break_skipped.store(true, Ordering::Relaxed);
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
+                // Buttons row
+                ui.horizontal(|ui| {
+                    // Pause/Resume button
+                    let pause_text = if self.is_paused { "Resume" } else { "Pause" };
+                    if ui.button(pause_text).clicked() {
+                        self.toggle_pause();
+                    }
+
+                    ui.add_space(10.0);
+
+                    // Skip break button
+                    if ui.button("Skip Break").clicked() {
+                        self.state.break_skipped.store(true, Ordering::Relaxed);
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                });
             });
         });
 

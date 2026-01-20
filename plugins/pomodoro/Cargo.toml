@@ -1,6 +1,6 @@
 [package]
 name = "taiga-pomodoro-plugin"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Pomodoro timer plugin for Taiga"
@@ -16,6 +16,7 @@ notify-rust = "4.11.7"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
 directories = "6.0.0"
+async-trait = "0.1"
 
 # GUI and audio for break window
 eframe = "0.33"

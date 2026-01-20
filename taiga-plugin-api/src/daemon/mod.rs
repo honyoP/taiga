@@ -5,7 +5,7 @@
 //!
 //! 1. **Low-level utilities** (`socket`, `ipc`) - Direct control over sockets and IPC
 //! 2. **Mid-level client helper** (`client`) - Automatic retry-with-autospawn pattern
-//! 3. **High-level traits** (future) - Structured daemon framework
+//! 3. **High-level traits** (`traits`) - Structured daemon framework
 //!
 //! # Example: Using the client helper
 //!
@@ -32,12 +32,36 @@
 //!     send_command_with_autospawn(&config, &cmd).await
 //! }
 //! ```
+//!
+//! # Example: Using the daemon framework
+//!
+//! ```rust,ignore
+//! use taiga_plugin_api::daemon::traits::{DaemonHandler, DaemonConfig, HandleResult, run_daemon_loop};
+//! use async_trait::async_trait;
+//!
+//! struct MyDaemon { counter: u32 }
+//!
+//! #[async_trait]
+//! impl DaemonHandler for MyDaemon {
+//!     type Command = MyCommand;
+//!     type Response = MyResponse;
+//!
+//!     async fn handle_command(&mut self, cmd: Self::Command) -> HandleResult<Self::Response> {
+//!         HandleResult::response(MyResponse::Ok)
+//!     }
+//! }
+//!
+//! // Run the daemon:
+//! run_daemon_loop(DaemonConfig::new("/tmp/my.sock"), MyDaemon { counter: 0 }).await?;
+//! ```
 
 pub mod socket;
 pub mod ipc;
 pub mod client;
+pub mod traits;
 
 // Re-export commonly used types
 pub use socket::{create_listener, connect, cleanup_socket};
 pub use ipc::{send_message, receive_message, spawn_daemon_process, DaemonSpawnConfig};
 pub use client::{send_command_with_autospawn, DaemonClientConfig};
+pub use traits::{DaemonHandler, DaemonConfig, HandleResult, run_daemon_loop};
