@@ -15,12 +15,13 @@ pub enum DaemonCommand {
         focus_len: u64,
         break_len: u64,
         cycles: u32,
+        no_gui: bool,
+        no_sound: bool,
     },
     Status,
     Stop,
     Pause,
     Resume,
-    // "Ping" is used by the client to check if the daemon is alive
     Ping,
     Kill,
 }
@@ -40,17 +41,14 @@ pub enum DaemonResponse {
 }
 
 pub fn get_socket_path() -> String {
-    // On Linux/Mac: /tmp/taiga.sock or /run/user/1000/taiga.sock
-    // On Windows: \\.\pipe\taiga
-
     if cfg!(windows) {
-        String::from(r"\\.\pipe\taiga-daemon")
+        String::from(r"\\.\pipe\taiga-pomo-daemon")
     } else {
         let base = BaseDirs::new().unwrap();
         let path = base
             .runtime_dir()
             .unwrap_or_else(|| base.cache_dir())
-            .join("taiga.sock");
+            .join("taiga-pomo.sock");
         path.to_string_lossy().to_string()
     }
 }
