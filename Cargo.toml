@@ -1,6 +1,10 @@
+[workspace]
+members = [".", "taiga-plugin-api", "plugins/pomodoro", "plugins/tui"]
+resolver = "2"
+
 [package]
 name = "taiga"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Tadeas Tran"]
 license = "MIT"
 edition = "2024"
@@ -9,6 +13,7 @@ edition = "2024"
 codename = "YATTA (Yet Another Terminal Task App)"
 
 [dependencies]
+taiga-plugin-api = { path = "taiga-plugin-api" }
 clap = { version = "4.5.54", features = ["derive"] }
 regex = "1.12.2"
 notify-rust = "4.11.7"
@@ -22,6 +27,10 @@ chrono-english = "0.1.8"
 thiserror = "1.0"
 tokio = { version = "1.49.0", features = ["full"] }
 interprocess = { version = "2.2.3", features = ["tokio"] }
+libloading = "0.8"
+async-trait = "0.1"
+colored = "2.1"
+atty = "0.2"
 
 [build-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }

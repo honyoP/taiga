@@ -1,0 +1,26 @@
+[package]
+name = "taiga-pomodoro-plugin"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+description = "Pomodoro timer plugin for Taiga"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+taiga-plugin-api = { path = "../../taiga-plugin-api" }
+tokio = { version = "1.49.0", features = ["full"] }
+interprocess = { version = "2.2.3", features = ["tokio"] }
+notify-rust = "4.11.7"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.148"
+directories = "6.0.0"
+async-trait = "0.1"
+
+# GUI and audio for break window
+eframe = "0.33"
+rodio = { version = "0.21", default-features = false, features = [
+  "symphonia-all",
+  "playback",
+] }
