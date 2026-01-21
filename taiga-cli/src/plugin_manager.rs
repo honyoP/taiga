@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use libloading::Library;
 
-use crate::error::{Result, TaigaError};
+use crate::error::{CliError, Result};
 use crate::plugin::{CommandResult, Plugin, PluginContext, PluginCreateFn, PluginInfo, RawPlugin};
 
 /// Holds a dynamically loaded plugin and its library handle
@@ -44,7 +44,7 @@ impl PluginManager {
         let name = plugin.name().to_string();
 
         if self.static_plugins.contains_key(&name) || self.dynamic_plugins.contains_key(&name) {
-            return Err(TaigaError::plugin(format!(
+            return Err(CliError::plugin(format!(
                 "Plugin '{}' is already registered",
                 name
             )));
@@ -52,7 +52,7 @@ impl PluginManager {
 
         plugin
             .on_load()
-            .map_err(|e| TaigaError::plugin(format!("Plugin load error: {}", e)))?;
+            .map_err(|e| CliError::plugin(format!("Plugin load error: {}", e)))?;
         self.static_plugins.insert(name, plugin);
         Ok(())
     }
@@ -67,13 +67,13 @@ impl PluginManager {
 
         let library = unsafe {
             Library::new(path).map_err(|e| {
-                TaigaError::plugin(format!("Failed to load plugin from {:?}: {}", path, e))
+                CliError::plugin(format!("Failed to load plugin from {:?}: {}", path, e))
             })?
         };
 
         let create_fn: libloading::Symbol<PluginCreateFn> = unsafe {
             library.get(b"taiga_plugin_create").map_err(|e| {
-                TaigaError::plugin(format!(
+                CliError::plugin(format!(
                     "Plugin {:?} missing 'taiga_plugin_create' symbol: {}",
                     path, e
                 ))
@@ -83,7 +83,7 @@ impl PluginManager {
         let plugin: Box<dyn Plugin> = unsafe {
             let raw: RawPlugin = create_fn();
             if raw.is_null() {
-                return Err(TaigaError::plugin(format!(
+                return Err(CliError::plugin(format!(
                     "Plugin {:?} returned null from create function",
                     path
                 )));
@@ -94,7 +94,7 @@ impl PluginManager {
         let name = plugin.name().to_string();
 
         if self.static_plugins.contains_key(&name) || self.dynamic_plugins.contains_key(&name) {
-            return Err(TaigaError::plugin(format!(
+            return Err(CliError::plugin(format!(
                 "Plugin '{}' is already registered",
                 name
             )));
@@ -119,7 +119,7 @@ impl PluginManager {
             }
 
             let entries = std::fs::read_dir(&path).map_err(|e| {
-                TaigaError::plugin(format!("Failed to read plugin directory {:?}: {}", path, e))
+                CliError::plugin(format!("Failed to read plugin directory {:?}: {}", path, e))
             })?;
 
             for entry in entries.flatten() {
@@ -135,7 +135,8 @@ impl PluginManager {
 
                 if is_plugin {
                     // Check file name to avoid loading duplicate plugins
-                    let file_name = file_path.file_name()
+                    let file_name = file_path
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("");
 
@@ -149,7 +150,8 @@ impl PluginManager {
                         .unwrap_or(file_name);
 
                     // Check if already loaded
-                    let already_loaded = loaded.iter().any(|p: &String| p.contains(plugin_base_name));
+                    let already_loaded =
+                        loaded.iter().any(|p: &String| p.contains(plugin_base_name));
                     if already_loaded {
                         continue;
                     }
@@ -225,11 +227,11 @@ impl PluginManager {
     ) -> Result<CommandResult> {
         let plugin = self
             .get(plugin_name)
-            .ok_or_else(|| TaigaError::plugin(format!("Plugin '{}' not found", plugin_name)))?;
+            .ok_or_else(|| CliError::plugin(format!("Plugin '{}' not found", plugin_name)))?;
 
         plugin
             .execute(command, args, ctx)
-            .map_err(|e| TaigaError::plugin(format!("Command execution failed: {}", e)))
+            .map_err(|e| CliError::plugin(format!("Command execution failed: {}", e)))
     }
 
     /// Unload all plugins (called on shutdown)

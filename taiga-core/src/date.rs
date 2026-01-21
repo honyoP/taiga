@@ -7,7 +7,8 @@
 //! - Offset: "in 3 days", "in 1 week"
 
 use chrono::{Datelike, Days, Local, NaiveDate, Weekday};
-use crate::error::{Result, TaigaError};
+
+use crate::error::{CoreError, Result};
 
 /// Parse a date string into a NaiveDate
 ///
@@ -43,35 +44,39 @@ pub fn parse_date(input: &str) -> Result<NaiveDate> {
 
     // Try various human-readable formats
     let formats = [
-        "%b %d %Y",      // Jan 25 2026
-        "%B %d %Y",      // January 25 2026
-        "%b %d",         // Jan 25
-        "%B %d",         // January 25
-        "%m/%d/%Y",      // 01/25/2026
-        "%m/%d",         // 01/25
-        "%d %b %Y",      // 25 Jan 2026
-        "%d %B %Y",      // 25 January 2026
+        "%b %d %Y", // Jan 25 2026
+        "%B %d %Y", // January 25 2026
+        "%b %d",    // Jan 25
+        "%B %d",    // January 25
+        "%m/%d/%Y", // 01/25/2026
+        "%m/%d",    // 01/25
+        "%d %b %Y", // 25 Jan 2026
+        "%d %B %Y", // 25 January 2026
     ];
 
     for format in &formats {
         if let Ok(mut date) = NaiveDate::parse_from_str(&input, format) {
             // If year is not specified, add current year
-            if !input.contains(|c: char| c.is_numeric() && input.matches(|d: char| d.is_numeric()).count() > 4) {
+            if !input.contains(|c: char| {
+                c.is_numeric() && input.matches(|d: char| d.is_numeric()).count() > 4
+            }) {
                 let current_year = Local::now().year();
-                date = date.with_year(current_year)
-                    .ok_or_else(|| TaigaError::parse("Invalid date"))?;
+                date = date
+                    .with_year(current_year)
+                    .ok_or_else(|| CoreError::parse("Invalid date"))?;
 
                 // If the date has passed this year, use next year
                 if date < Local::now().date_naive() {
-                    date = date.with_year(current_year + 1)
-                        .ok_or_else(|| TaigaError::parse("Invalid date"))?;
+                    date = date
+                        .with_year(current_year + 1)
+                        .ok_or_else(|| CoreError::parse("Invalid date"))?;
                 }
             }
             return Ok(date);
         }
     }
 
-    Err(TaigaError::parse(format!(
+    Err(CoreError::parse(format!(
         "Could not parse date '{}'. Try formats like: 'tomorrow', 'Jan 25', '2026-01-25', 'next monday', 'in 3 days'",
         input
     )))
@@ -114,12 +119,16 @@ fn try_parse_weekday(input: &str) -> Option<NaiveDate> {
     let days_until = if use_next_week {
         // Always go to next week
         let days = (target_weekday.num_days_from_monday() as i64
-            - current_weekday.num_days_from_monday() as i64 + 7) % 7;
+            - current_weekday.num_days_from_monday() as i64
+            + 7)
+            % 7;
         if days == 0 { 7 } else { days as u64 }
     } else {
         // Go to next occurrence (could be today if it matches)
         let days = (target_weekday.num_days_from_monday() as i64
-            - current_weekday.num_days_from_monday() as i64 + 7) % 7;
+            - current_weekday.num_days_from_monday() as i64
+            + 7)
+            % 7;
         if days == 0 { 7 } else { days as u64 }
     };
 
@@ -167,8 +176,8 @@ pub fn format_date_human(date: NaiveDate, relative_to_today: bool) -> String {
         0 => "Today".to_string(),
         1 => "Tomorrow".to_string(),
         -1 => "Yesterday".to_string(),
-        2..=6 => date.format("%a %b %d").to_string(), // "Mon Jan 27"
-        7..=365 => date.format("%b %d").to_string(),  // "Jan 27"
+        2..=6 => date.format("%a %b %d").to_string(),   // "Mon Jan 27"
+        7..=365 => date.format("%b %d").to_string(),    // "Jan 27"
         _ if diff < 0 => format!("Overdue ({} days ago)", -diff),
         _ => date.format("%Y-%m-%d").to_string(),
     }
@@ -213,14 +222,23 @@ mod tests {
         let today = Local::now().date_naive();
         assert_eq!(parse_date("in 3 days").unwrap(), today + Duration::days(3));
         assert_eq!(parse_date("in 1 week").unwrap(), today + Duration::days(7));
-        assert_eq!(parse_date("in 2 weeks").unwrap(), today + Duration::days(14));
+        assert_eq!(
+            parse_date("in 2 weeks").unwrap(),
+            today + Duration::days(14)
+        );
     }
 
     #[test]
     fn test_format_date_human() {
         let today = Local::now().date_naive();
         assert_eq!(format_date_human(today, true), "Today");
-        assert_eq!(format_date_human(today + Duration::days(1), true), "Tomorrow");
-        assert_eq!(format_date_human(today - Duration::days(1), true), "Yesterday");
+        assert_eq!(
+            format_date_human(today + Duration::days(1), true),
+            "Tomorrow"
+        );
+        assert_eq!(
+            format_date_human(today - Duration::days(1), true),
+            "Yesterday"
+        );
     }
 }

@@ -4,8 +4,9 @@
 
 use chrono::Local;
 use colored::*;
-use crate::date_parser::format_date_human;
-use crate::task::Task;
+
+use taiga_core::date::format_date_human;
+use taiga_core::Task;
 
 /// Display mode for task list
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,11 +28,7 @@ pub fn supports_color() -> bool {
 pub fn format_task(task: &Task, mode: DisplayMode, use_color: bool) -> String {
     let today = Local::now().date_naive();
 
-    let checkbox = if task.is_complete {
-        "[✓]"
-    } else {
-        "[ ]"
-    };
+    let checkbox = if task.is_complete { "[✓]" } else { "[ ]" };
 
     let status_info = match &task.scheduled {
         Some(dt) => {
@@ -78,12 +75,23 @@ pub fn format_task(task: &Task, mode: DisplayMode, use_color: bool) -> String {
             ];
 
             if let Some(dt) = &task.scheduled {
-                parts.push(format!("Scheduled: {} {}", dt.format("%Y-%m-%d"), status_info));
+                parts.push(format!(
+                    "Scheduled: {} {}",
+                    dt.format("%Y-%m-%d"),
+                    status_info
+                ));
             } else {
                 parts.push("Scheduled: (none)".to_string());
             }
 
-            parts.push(format!("Status: {}", if task.is_complete { "Complete" } else { "Incomplete" }));
+            parts.push(format!(
+                "Status: {}",
+                if task.is_complete {
+                    "Complete"
+                } else {
+                    "Incomplete"
+                }
+            ));
             parts.join("\n  ")
         }
         DisplayMode::Default => {
@@ -122,10 +130,7 @@ pub fn format_summary(total: usize, completed: usize, overdue: usize, use_color:
         },
     ];
 
-    let summary: Vec<&str> = parts.iter()
-        .filter(|s| !s.is_empty())
-        .map(|s| s.as_str())
-        .collect();
+    let summary: Vec<&str> = parts.iter().filter(|s| !s.is_empty()).map(|s| s.as_str()).collect();
 
     format!("[{}]", summary.join(" | "))
 }
@@ -136,12 +141,7 @@ mod tests {
 
     #[test]
     fn test_format_task_compact() {
-        let task = Task {
-            id: 1,
-            title: "Test task".to_string(),
-            is_complete: false,
-            scheduled: None,
-        };
+        let task = Task::new("Test task").with_id(1);
 
         let output = format_task(&task, DisplayMode::Compact, false);
         assert!(output.contains("[ ]"));
@@ -151,12 +151,7 @@ mod tests {
 
     #[test]
     fn test_format_task_completed() {
-        let task = Task {
-            id: 2,
-            title: "Done task".to_string(),
-            is_complete: true,
-            scheduled: None,
-        };
+        let task = Task::new("Done task").with_id(2).with_complete(true);
 
         let output = format_task(&task, DisplayMode::Default, false);
         assert!(output.contains("[✓]"));

@@ -723,16 +723,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chrono-english"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38a56613410c9249673f4676ab8d27c70949814accb27b6b738009e2ff1034a1"
-dependencies = [
- "chrono",
- "scanlex",
-]
-
-[[package]]
 name = "clap"
 version = "4.5.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3222,12 +3212,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scanlex"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "088c5d71572124929ea7549a8ce98e1a6fd33d0a38367b09027b382e67c033db"
-
-[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3734,28 +3718,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "taiga"
+name = "taiga-core"
 version = "0.2.0"
 dependencies = [
- "async-trait",
- "atty",
  "chrono",
- "chrono-english",
- "clap",
- "colored",
- "confy",
- "directories",
- "dirs",
- "interprocess",
- "libloading",
- "notify-rust",
  "regex",
  "serde",
- "serde_json",
- "taiga-plugin-api",
  "thiserror 1.0.69",
- "tokio",
- "toml",
 ]
 
 [[package]]
@@ -3784,6 +3753,31 @@ dependencies = [
  "serde_json",
  "taiga-plugin-api",
  "tokio",
+]
+
+[[package]]
+name = "taiga-todo"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "atty",
+ "chrono",
+ "clap",
+ "colored",
+ "confy",
+ "directories",
+ "dirs",
+ "interprocess",
+ "libloading",
+ "notify-rust",
+ "regex",
+ "serde",
+ "serde_json",
+ "taiga-core",
+ "taiga-plugin-api",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

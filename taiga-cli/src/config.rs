@@ -7,7 +7,7 @@ pub struct Config {
     pub task_filename: String,
 }
 
-impl ::std::default::Default for Config {
+impl Default for Config {
     fn default() -> Self {
         let default_path = dirs::home_dir()
             .map(|mut p| {
