@@ -64,15 +64,46 @@ pub fn format_task(task: &Task, mode: DisplayMode, use_color: bool) -> String {
         task.title.clone()
     };
 
+    // Format tags
+    let tags_str = if task.tags.is_empty() {
+        String::new()
+    } else if use_color {
+        format!(
+            " {}",
+            task.tags
+                .iter()
+                .map(|t| format!("#{}", t).magenta().to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    } else {
+        format!(
+            " {}",
+            task.tags
+                .iter()
+                .map(|t| format!("#{}", t))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    };
+
     match mode {
         DisplayMode::Compact => {
-            format!("{} [{}] {}", checkbox, task.id, title)
+            format!("{} [{}] {}{}", checkbox, task.id, title, tags_str)
         }
         DisplayMode::Detailed => {
             let mut parts = vec![
                 format!("{} [ID: {}]", checkbox, task.id),
-                format!("Title: {}", title),
+                format!("Title: {}{}", title, tags_str),
             ];
+
+            if let Some(cat) = &task.category {
+                parts.push(format!("Category: {}", cat));
+            }
+
+            if !task.tags.is_empty() {
+                parts.push(format!("Tags: {}", task.tags.iter().map(|t| format!("#{}", t)).collect::<Vec<_>>().join(" ")));
+            }
 
             if let Some(dt) = &task.scheduled {
                 parts.push(format!(
@@ -102,9 +133,9 @@ pub fn format_task(task: &Task, mode: DisplayMode, use_color: bool) -> String {
             };
 
             if status_info.is_empty() {
-                format!("{} {} {}", checkbox, id_str, title)
+                format!("{} {} {}{}", checkbox, id_str, title, tags_str)
             } else {
-                format!("{} {} {} {}", checkbox, id_str, title, status_info)
+                format!("{} {} {}{} {}", checkbox, id_str, title, tags_str, status_info)
             }
         }
     }

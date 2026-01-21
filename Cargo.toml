@@ -1,9 +1,9 @@
 [workspace]
 members = [
-    "taiga-core",
-    "taiga-cli",
-    "taiga-plugin-api",
-    "plugins/pomodoro",
-    "plugins/tui"
+  "taiga-core",
+  "taiga-cli",
+  "taiga-plugin-api",
+  "plugins/pomodoro",
+  "plugins/tui",
 ]
 resolver = "2"

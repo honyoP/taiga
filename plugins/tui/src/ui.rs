@@ -1,6 +1,6 @@
 //! TUI rendering module
 
-use crate::app::{App, DialogMode};
+use crate::app::{App, DialogMode, SidebarSection};
 use crate::task_storage::Task;
 use chrono::Local;
 use ratatui::{
@@ -12,19 +12,31 @@ use ratatui::{
 };
 
 pub fn draw(f: &mut Frame, app: &App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
+    // Main horizontal layout: sidebar + content
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
         .margin(1)
+        .constraints([
+            Constraint::Length(22),  // Sidebar
+            Constraint::Min(40),     // Content
+        ])
+        .split(f.area());
+
+    draw_sidebar(f, app, main_chunks[0]);
+
+    // Content area: task list + status + controls
+    let content_chunks = Layout::default()
+        .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(10),    // Task list
             Constraint::Length(3), // Status bar
             Constraint::Length(3), // Controls
         ])
-        .split(f.area());
+        .split(main_chunks[1]);
 
-    draw_task_list(f, app, chunks[0]);
-    draw_status_bar(f, app, chunks[1]);
-    draw_controls(f, app, chunks[2]);
+    draw_task_list(f, app, content_chunks[0]);
+    draw_status_bar(f, app, content_chunks[1]);
+    draw_controls(f, app, content_chunks[2]);
 
     // Draw dialogs on top
     match &app.dialog {
@@ -51,12 +63,156 @@ pub fn draw(f: &mut Frame, app: &App) {
         DialogMode::Help => {
             draw_help_dialog(f);
         }
+        DialogMode::MoveCategory { task_id: _, categories, selected } => {
+            draw_move_category_dialog(f, categories, *selected);
+        }
+        DialogMode::AddTag { task_id: _, input } => {
+            draw_add_tag_dialog(f, input);
+        }
+        DialogMode::RemoveTag { task_id: _, tags, selected } => {
+            draw_remove_tag_dialog(f, tags, *selected);
+        }
     }
 
     // Draw error message if any
     if let Some(msg) = &app.error_message {
         draw_error_message(f, msg);
     }
+}
+
+fn draw_sidebar(f: &mut Frame, app: &App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(60),  // Categories
+            Constraint::Percentage(40),  // Tags
+        ])
+        .split(area);
+
+    // Draw categories section
+    let category_border_style = if app.sidebar_focused && app.sidebar_section == SidebarSection::Categories {
+        Style::default().fg(Color::Yellow)
+    } else if app.sidebar_focused {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let mut category_items: Vec<ListItem> = vec![
+        // "All" option
+        {
+            let is_selected = app.sidebar_focused
+                && app.sidebar_section == SidebarSection::Categories
+                && app.sidebar_selection == 0;
+            let is_active = app.selected_category.is_none();
+            let style = if is_selected {
+                Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+            } else if is_active {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            let total = app.storage.tasks.len();
+            ListItem::new(format!("All ({})", total)).style(style)
+        },
+        // "Uncategorized" option
+        {
+            let is_selected = app.sidebar_focused
+                && app.sidebar_section == SidebarSection::Categories
+                && app.sidebar_selection == 1;
+            let is_active = app.selected_category == Some(None);
+            let style = if is_selected {
+                Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+            } else if is_active {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            let count = app.storage.count_in_category(None);
+            ListItem::new(format!("Uncategorized ({})", count)).style(style)
+        },
+    ];
+
+    // Add specific categories
+    for (i, cat) in app.categories.iter().enumerate() {
+        let is_selected = app.sidebar_focused
+            && app.sidebar_section == SidebarSection::Categories
+            && app.sidebar_selection == i + 2;
+        let is_active = app.selected_category == Some(Some(cat.clone()));
+        let style = if is_selected {
+            Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+        } else if is_active {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default()
+        };
+        let count = app.storage.count_in_category(Some(cat));
+        category_items.push(ListItem::new(format!("{} ({})", cat, count)).style(style));
+    }
+
+    let categories_list = List::new(category_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Categories ")
+                .border_style(category_border_style),
+        );
+
+    f.render_widget(categories_list, chunks[0]);
+
+    // Draw tags section
+    let tags_border_style = if app.sidebar_focused && app.sidebar_section == SidebarSection::Tags {
+        Style::default().fg(Color::Yellow)
+    } else if app.sidebar_focused {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let mut tag_items: Vec<ListItem> = vec![
+        // "All" option
+        {
+            let is_selected = app.sidebar_focused
+                && app.sidebar_section == SidebarSection::Tags
+                && app.sidebar_selection == 0;
+            let is_active = app.selected_tag_filter.is_none();
+            let style = if is_selected {
+                Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+            } else if is_active {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            ListItem::new("All").style(style)
+        },
+    ];
+
+    // Add specific tags
+    for (i, tag) in app.all_tags.iter().enumerate() {
+        let is_selected = app.sidebar_focused
+            && app.sidebar_section == SidebarSection::Tags
+            && app.sidebar_selection == i + 1;
+        let is_active = app.selected_tag_filter.as_ref() == Some(tag);
+        let style = if is_selected {
+            Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+        } else if is_active {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default().fg(Color::Magenta)
+        };
+        let count = app.storage.count_with_tag(tag);
+        tag_items.push(ListItem::new(format!("#{} ({})", tag, count)).style(style));
+    }
+
+    let tags_list = List::new(tag_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Tags ")
+                .border_style(tags_border_style),
+        );
+
+    f.render_widget(tags_list, chunks[1]);
 }
 
 fn draw_task_list(f: &mut Frame, app: &App, area: Rect) {
@@ -144,6 +300,14 @@ fn create_task_item(task: &Task, is_selected: bool, today: chrono::NaiveDate) ->
     };
 
     spans.push(Span::styled(task.title.clone(), title_style));
+
+    // Tags in magenta
+    for tag in &task.tags {
+        spans.push(Span::styled(
+            format!(" #{}", tag),
+            Style::default().fg(Color::Magenta),
+        ));
+    }
 
     // Date info
     if let Some((date_str, diff)) = date_info {
@@ -376,13 +540,14 @@ fn draw_confirm_dialog(f: &mut Frame, title: &str, message: &str) {
 }
 
 fn draw_help_dialog(f: &mut Frame) {
-    let area = centered_rect(60, 70, f.area());
+    let area = centered_rect(65, 80, f.area());
 
     f.render_widget(Clear, area);
 
     let help_text = vec![
         Line::from(vec![Span::styled("Navigation", Style::default().add_modifier(Modifier::BOLD))]),
         Line::from("  ↑/↓ or j/k  Move selection"),
+        Line::from("  Tab/h/l     Toggle sidebar/task list focus"),
         Line::from("  g/G         Go to top/bottom"),
         Line::from("  Home/End    Go to top/bottom"),
         Line::from(""),
@@ -392,6 +557,11 @@ fn draw_help_dialog(f: &mut Frame) {
         Line::from("  e           Edit selected task"),
         Line::from("  d/Delete    Delete selected task"),
         Line::from("  c           Clear completed tasks"),
+        Line::from(""),
+        Line::from(vec![Span::styled("Categories & Tags", Style::default().add_modifier(Modifier::BOLD))]),
+        Line::from("  m           Move task to category"),
+        Line::from("  t           Add tag to task"),
+        Line::from("  T           Remove tag from task"),
         Line::from(""),
         Line::from(vec![Span::styled("View Controls", Style::default().add_modifier(Modifier::BOLD))]),
         Line::from("  f           Cycle filter mode"),
@@ -431,6 +601,124 @@ fn draw_error_message(f: &mut Frame, message: &str) {
         .alignment(Alignment::Center);
 
     f.render_widget(msg, area);
+}
+
+fn draw_move_category_dialog(f: &mut Frame, categories: &[String], selected: usize) {
+    let area = centered_rect(40, 50, f.area());
+
+    f.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Move to Category ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let items: Vec<ListItem> = categories
+        .iter()
+        .enumerate()
+        .map(|(i, cat)| {
+            let style = if i == selected {
+                Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            ListItem::new(cat.as_str()).style(style)
+        })
+        .collect();
+
+    let list = List::new(items);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Min(3), Constraint::Length(2)])
+        .split(inner);
+
+    f.render_widget(list, chunks[0]);
+
+    let hint = Paragraph::new("↑/↓ to select, Enter to confirm, Esc to cancel")
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+
+    f.render_widget(hint, chunks[1]);
+}
+
+fn draw_add_tag_dialog(f: &mut Frame, input: &str) {
+    let area = centered_rect(40, 25, f.area());
+
+    f.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Add Tag ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Magenta));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Length(3), Constraint::Length(2)])
+        .split(inner);
+
+    let input_text = Paragraph::new(format!("Tag: {}_", input))
+        .style(Style::default())
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(input_text, chunks[0]);
+
+    let hint = Paragraph::new("Enter to confirm, Esc to cancel")
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+
+    f.render_widget(hint, chunks[1]);
+}
+
+fn draw_remove_tag_dialog(f: &mut Frame, tags: &[String], selected: usize) {
+    let area = centered_rect(40, 40, f.area());
+
+    f.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Remove Tag ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let items: Vec<ListItem> = tags
+        .iter()
+        .enumerate()
+        .map(|(i, tag)| {
+            let style = if i == selected {
+                Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Magenta)
+            };
+            ListItem::new(format!("#{}", tag)).style(style)
+        })
+        .collect();
+
+    let list = List::new(items);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Min(3), Constraint::Length(2)])
+        .split(inner);
+
+    f.render_widget(list, chunks[0]);
+
+    let hint = Paragraph::new("↑/↓ to select, Enter to remove, Esc to cancel")
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+
+    f.render_widget(hint, chunks[1]);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {

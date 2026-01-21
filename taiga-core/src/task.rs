@@ -37,6 +37,10 @@ pub struct Task {
     pub title: String,
     pub is_complete: bool,
     pub scheduled: Option<DateTime<Local>>,
+    /// Category this task belongs to (None = "Uncategorized")
+    pub category: Option<String>,
+    /// Tags associated with this task (without # prefix)
+    pub tags: Vec<String>,
 }
 
 impl Task {
@@ -47,6 +51,8 @@ impl Task {
             title: title.into(),
             is_complete: false,
             scheduled: None,
+            category: None,
+            tags: Vec::new(),
         }
     }
 
@@ -66,6 +72,37 @@ impl Task {
     pub fn with_complete(mut self, complete: bool) -> Self {
         self.is_complete = complete;
         self
+    }
+
+    /// Builder method to set category
+    pub fn with_category(mut self, category: Option<String>) -> Self {
+        self.category = category;
+        self
+    }
+
+    /// Builder method to set tags
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Add a tag to this task
+    pub fn add_tag(&mut self, tag: &str) {
+        let tag = tag.trim_start_matches('#').to_string();
+        if !self.tags.contains(&tag) {
+            self.tags.push(tag);
+        }
+    }
+
+    /// Remove a tag from this task
+    pub fn remove_tag(&mut self, tag: &str) -> bool {
+        let tag = tag.trim_start_matches('#');
+        if let Some(pos) = self.tags.iter().position(|t| t == tag) {
+            self.tags.remove(pos);
+            true
+        } else {
+            false
+        }
     }
 
     /// Toggle completion status
@@ -104,6 +141,17 @@ impl TaskCollection {
 
     /// Add a new task with the given title and optional scheduled date
     pub fn add(&mut self, title: impl Into<String>, scheduled: Option<DateTime<Local>>) -> u32 {
+        self.add_with_category_tags(title, scheduled, None, Vec::new())
+    }
+
+    /// Add a new task with category and tags
+    pub fn add_with_category_tags(
+        &mut self,
+        title: impl Into<String>,
+        scheduled: Option<DateTime<Local>>,
+        category: Option<String>,
+        tags: Vec<String>,
+    ) -> u32 {
         let id = self.find_next_id();
 
         let task = Task {
@@ -111,6 +159,8 @@ impl TaskCollection {
             title: title.into(),
             is_complete: false,
             scheduled,
+            category,
+            tags,
         };
 
         self.tasks.insert(id, task);
@@ -226,6 +276,53 @@ impl TaskCollection {
     /// Get mutable or return error if task not found
     pub fn get_mut_or_err(&mut self, id: u32) -> Result<&mut Task> {
         self.get_mut(id).ok_or(CoreError::TaskNotFound(id))
+    }
+
+    /// Get unique categories sorted alphabetically
+    pub fn get_categories(&self) -> Vec<String> {
+        let mut categories: Vec<String> = self
+            .tasks
+            .values()
+            .filter_map(|t| t.category.clone())
+            .collect();
+        categories.sort();
+        categories.dedup();
+        categories
+    }
+
+    /// Get all unique tags sorted alphabetically
+    pub fn get_all_tags(&self) -> Vec<String> {
+        let mut tags: Vec<String> = self
+            .tasks
+            .values()
+            .flat_map(|t| t.tags.iter().cloned())
+            .collect();
+        tags.sort();
+        tags.dedup();
+        tags
+    }
+
+    /// Move a task to a different category
+    pub fn move_to_category(&mut self, id: u32, category: Option<String>) -> Result<()> {
+        let task = self.get_mut_or_err(id)?;
+        task.category = category;
+        Ok(())
+    }
+
+    /// Get tasks in a specific category (None = uncategorized)
+    pub fn tasks_in_category(&self, category: Option<&str>) -> Vec<&Task> {
+        self.tasks
+            .values()
+            .filter(|t| t.category.as_deref() == category)
+            .collect()
+    }
+
+    /// Get tasks with a specific tag
+    pub fn tasks_with_tag(&self, tag: &str) -> Vec<&Task> {
+        self.tasks
+            .values()
+            .filter(|t| t.tags.iter().any(|t_tag| t_tag == tag))
+            .collect()
     }
 }
 

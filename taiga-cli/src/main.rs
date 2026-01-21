@@ -5,9 +5,9 @@ use chrono::{Local, TimeZone};
 use clap::Parser;
 
 use taiga_core::date::parse_date;
-use taiga_core::filter::FilterExt;
+use taiga_core::filter::{FilterExt, TaskFilter, TaskSort};
 
-use crate::cli::{Cli, Commands, SortBy};
+use crate::cli::{Cli, Commands, SortBy, TagAction};
 use crate::display::{format_summary, format_task, supports_color, DisplayMode};
 use crate::error::{CliError, Result};
 use crate::plugin::{CommandResult, PluginContext};
@@ -61,7 +61,7 @@ fn main() -> Result<()> {
         .with_extra("task_filename", &cfg.task_filename);
 
     match cli.command {
-        Commands::Add { title, on, date } => {
+        Commands::Add { title, on, date, category, tag } => {
             let mut collection = storage.load()?;
             let title_str = title.join(" ");
 
@@ -78,18 +78,23 @@ fn main() -> Result<()> {
                 None
             };
 
-            collection.add(title_str.clone(), scheduled);
+            // Handle category - "none" means uncategorized (None)
+            let task_category = category.filter(|c| c.to_lowercase() != "none");
+
+            collection.add_with_category_tags(title_str.clone(), scheduled, task_category.clone(), tag.clone());
             storage.save(&collection)?;
 
-            if let Some(dt) = scheduled {
-                println!(
-                    "Task added: {} (scheduled: {})",
-                    title_str,
-                    dt.format("%Y-%m-%d")
-                );
-            } else {
-                println!("Task added: {}", title_str);
+            let mut msg = format!("Task added: {}", title_str);
+            if let Some(cat) = task_category {
+                msg.push_str(&format!(" [{}]", cat));
             }
+            if !tag.is_empty() {
+                msg.push_str(&format!(" #{}", tag.join(" #")));
+            }
+            if let Some(dt) = scheduled {
+                msg.push_str(&format!(" (scheduled: {})", dt.format("%Y-%m-%d")));
+            }
+            println!("{}", msg);
         }
 
         Commands::List {
@@ -104,6 +109,8 @@ fn main() -> Result<()> {
             compact,
             detailed,
             no_color,
+            category,
+            tag,
         } => {
             let collection = storage.load()?;
 
@@ -125,21 +132,35 @@ fn main() -> Result<()> {
             };
 
             // Get sort key
-            let sort_key = match sort {
-                SortBy::Id => "id",
-                SortBy::Date => "date",
-                SortBy::Name => "name",
-                SortBy::Status => "status",
+            let sort_by = match sort {
+                SortBy::Id => TaskSort::Id,
+                SortBy::Date => TaskSort::Date,
+                SortBy::Name => TaskSort::Name,
+                SortBy::Status => TaskSort::Status,
             };
 
-            let tasks = collection.get_filtered_sorted(
-                filter_checked,
-                filter_scheduled,
-                overdue,
-                search.as_deref(),
-                sort_key,
-                reverse,
-            );
+            // Build filter with category and tag support
+            let mut filter = TaskFilter::new()
+                .with_checked(filter_checked)
+                .with_scheduled(filter_scheduled)
+                .with_overdue(overdue)
+                .with_search(search)
+                .sort_by(sort_by)
+                .with_reverse(reverse);
+
+            // Handle category filter
+            if let Some(cat) = category {
+                if cat.to_lowercase() == "none" {
+                    filter = filter.uncategorized();
+                } else {
+                    filter = filter.in_category(cat);
+                }
+            }
+
+            // Handle tag filters
+            filter = filter.with_tags(tag);
+
+            let tasks = collection.get_filtered(&filter);
 
             if tasks.is_empty() {
                 println!("No tasks found.");
@@ -338,6 +359,89 @@ fn main() -> Result<()> {
                         println!("      {} {} - {}", cmd.name, usage, cmd.description);
                     }
                     println!();
+                }
+            }
+        }
+
+        Commands::Move { id, category } => {
+            let mut collection = storage.load()?;
+            let task = collection.get_mut_or_err(id)?;
+
+            let new_category = if category.to_lowercase() == "none" {
+                None
+            } else {
+                Some(category.clone())
+            };
+
+            let old_category = task.category.clone();
+            task.category = new_category.clone();
+            storage.save(&collection)?;
+
+            let old_name = old_category.as_deref().unwrap_or("Uncategorized");
+            let new_name = new_category.as_deref().unwrap_or("Uncategorized");
+            println!("Moved task #{} from '{}' to '{}'", id, old_name, new_name);
+        }
+
+        Commands::Tag { id, action } => {
+            let mut collection = storage.load()?;
+            let task = collection.get_mut_or_err(id)?;
+
+            match action {
+                TagAction::Add { tag } => {
+                    let tag_clean = tag.trim_start_matches('#');
+                    if task.tags.contains(&tag_clean.to_string()) {
+                        println!("Task #{} already has tag #{}", id, tag_clean);
+                    } else {
+                        task.add_tag(tag_clean);
+                        storage.save(&collection)?;
+                        println!("Added tag #{} to task #{}", tag_clean, id);
+                    }
+                }
+                TagAction::Remove { tag } => {
+                    let tag_clean = tag.trim_start_matches('#');
+                    if task.remove_tag(tag_clean) {
+                        storage.save(&collection)?;
+                        println!("Removed tag #{} from task #{}", tag_clean, id);
+                    } else {
+                        println!("Task #{} doesn't have tag #{}", id, tag_clean);
+                    }
+                }
+            }
+        }
+
+        Commands::Categories => {
+            let collection = storage.load()?;
+            let categories = collection.get_categories();
+
+            if categories.is_empty() {
+                println!("No categories found.");
+                println!("(All tasks are uncategorized)");
+            } else {
+                println!("Categories:");
+                for cat in &categories {
+                    let count = collection.tasks_in_category(Some(cat)).len();
+                    println!("  {} ({} tasks)", cat, count);
+                }
+
+                // Also show uncategorized count
+                let uncategorized = collection.tasks_in_category(None).len();
+                if uncategorized > 0 {
+                    println!("  Uncategorized ({} tasks)", uncategorized);
+                }
+            }
+        }
+
+        Commands::Tags => {
+            let collection = storage.load()?;
+            let tags = collection.get_all_tags();
+
+            if tags.is_empty() {
+                println!("No tags found.");
+            } else {
+                println!("Tags:");
+                for tag in &tags {
+                    let count = collection.tasks_with_tag(tag).len();
+                    println!("  #{} ({} tasks)", tag, count);
                 }
             }
         }

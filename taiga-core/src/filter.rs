@@ -43,6 +43,10 @@ pub struct TaskFilter {
     pub sort: TaskSort,
     /// Reverse sort order
     pub reverse: bool,
+    /// Filter by category (Some(Some("Work")) = in "Work", Some(None) = uncategorized)
+    pub category: Option<Option<String>>,
+    /// Filter by tags (all must match)
+    pub tags: Vec<String>,
 }
 
 impl TaskFilter {
@@ -129,6 +133,36 @@ impl TaskFilter {
         self
     }
 
+    /// Filter by exact category
+    pub fn in_category(mut self, category: impl Into<String>) -> Self {
+        self.category = Some(Some(category.into()));
+        self
+    }
+
+    /// Filter to uncategorized tasks only
+    pub fn uncategorized(mut self) -> Self {
+        self.category = Some(None);
+        self
+    }
+
+    /// Set category filter
+    pub fn with_category(mut self, category: Option<Option<String>>) -> Self {
+        self.category = category;
+        self
+    }
+
+    /// Filter by tag (must have this tag)
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into());
+        self
+    }
+
+    /// Set tags filter (all must match)
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
     /// Check if a task matches this filter
     pub fn matches(&self, task: &Task) -> bool {
         let today = Local::now().date_naive();
@@ -161,6 +195,20 @@ impl TaskFilter {
         // Filter by search term
         if let Some(term) = &self.search {
             if !task.title.to_lowercase().contains(&term.to_lowercase()) {
+                return false;
+            }
+        }
+
+        // Filter by category
+        if let Some(ref cat_filter) = self.category {
+            if task.category.as_ref() != cat_filter.as_ref() {
+                return false;
+            }
+        }
+
+        // Filter by tags (all must match)
+        for tag in &self.tags {
+            if !task.tags.iter().any(|t| t == tag) {
                 return false;
             }
         }

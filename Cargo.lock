@@ -3719,7 +3719,7 @@ dependencies = [
 
 [[package]]
 name = "taiga-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "regex",
@@ -3757,7 +3757,7 @@ dependencies = [
 
 [[package]]
 name = "taiga-todo"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "atty",
@@ -3782,7 +3782,7 @@ dependencies = [
 
 [[package]]
 name = "taiga-tui-plugin"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "crossterm",

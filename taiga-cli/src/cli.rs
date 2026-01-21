@@ -45,6 +45,12 @@ pub enum Commands {
         /// Schedule the task on a specific date (alias for --on)
         #[arg(long, value_name = "DATE")]
         date: Option<String>,
+        /// Category for the task
+        #[arg(long, short = 'C', value_name = "CATEGORY")]
+        category: Option<String>,
+        /// Tags for the task (can be specified multiple times)
+        #[arg(long, short = 't', value_name = "TAG")]
+        tag: Vec<String>,
     },
 
     /// Lists tasks with filtering and sorting
@@ -82,6 +88,12 @@ pub enum Commands {
         /// Disable colors
         #[arg(long)]
         no_color: bool,
+        /// Filter by category (use 'none' for uncategorized)
+        #[arg(long, short = 'C', value_name = "CATEGORY")]
+        category: Option<String>,
+        /// Filter by tag (can be specified multiple times, all must match)
+        #[arg(long, short = 't', value_name = "TAG")]
+        tag: Vec<String>,
     },
 
     /// Toggles task completion status
@@ -152,7 +164,47 @@ pub enum Commands {
     /// List loaded plugins
     Plugins,
 
+    /// Move a task to a different category
+    Move {
+        /// Task ID to move
+        #[arg(value_parser = clap::value_parser!(u32))]
+        id: u32,
+        /// Target category (use 'none' for uncategorized)
+        category: String,
+    },
+
+    /// Add or remove tags from a task
+    Tag {
+        /// Task ID to modify
+        #[arg(value_parser = clap::value_parser!(u32))]
+        id: u32,
+        /// Tag action (add or remove)
+        #[command(subcommand)]
+        action: TagAction,
+    },
+
+    /// List all categories
+    Categories,
+
+    /// List all tags
+    Tags,
+
     /// External command (handled by plugins)
     #[command(external_subcommand)]
     External(Vec<String>),
+}
+
+/// Tag subcommands
+#[derive(Subcommand)]
+pub enum TagAction {
+    /// Add a tag to a task
+    Add {
+        /// Tag to add (without # prefix)
+        tag: String,
+    },
+    /// Remove a tag from a task
+    Remove {
+        /// Tag to remove (without # prefix)
+        tag: String,
+    },
 }
