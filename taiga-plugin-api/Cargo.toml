@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "Plugin API for Taiga task manager"
+repository = "https://github.com/honyoP/taiginator"
+readme = "../README.md"
+keywords = ["task", "todo", "plugin", "cli"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 thiserror = "1.0"

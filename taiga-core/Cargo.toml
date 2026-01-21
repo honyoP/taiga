@@ -1,0 +1,16 @@
+[package]
+name = "taiga-core"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+description = "Core domain logic for Taiga task manager"
+repository = "https://github.com/honyoP/taiginator"
+readme = "../README.md"
+keywords = ["task", "todo", "productivity", "cli"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.12"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
