@@ -30,6 +30,9 @@ I wanted a tool that:
 * **🧠 Human Scheduling:** Understands "tomorrow", "next friday", and "2024-01-01".
 * **🛡️ ID-Based:** Every task gets a unique ID. No ambiguities.
 * **🦾 Regex Powered:** Uses a custom regex parser to read your markdown file, because XML parsers are for cowards.
+* **🔌 Plugin System:** Extend Taiga with plugins. Because why stop at task management when you can have world domination?
+* **🍅 Pomodoro Timer:** Built-in focus timer with audio cues and break windows. Procrastination just got harder.
+* **🖥️ Terminal UI:** A full TUI mode for those who find typing commands too mainstream.
 
 ---
 
@@ -119,6 +122,70 @@ taiga remove 1
 
 ```
 
+### 5. Edit Tasks
+
+Made a typo? Change the name or date.
+
+```bash
+taiga edit 1 --name "Actually fix the bug this time"
+taiga edit 1 --date "next monday"
+
+```
+
+### 6. Housekeeping
+
+```bash
+taiga clear --checked   # Remove all completed tasks
+taiga reindex           # Renumber task IDs sequentially
+taiga recover           # Restore from backup (we all make mistakes)
+
+```
+
+---
+
+## 🔌 Plugins
+
+Taiga has a plugin system. Yes, really. A CLI task manager with plugins. We've come full circle.
+
+### 🍅 Pomodoro Timer
+
+Focus like a caffeinated squirrel.
+
+```bash
+taiga pomo start 25 5 4          # 25 min focus, 5 min break, 4 cycles
+taiga pomo status                # Check timer status
+taiga pomo pause                 # Take an unscheduled break
+taiga pomo resume                # Back to work
+taiga pomo stop                  # Give up (we don't judge)
+
+```
+
+**Options:**
+- `--no-gui` — Skip the break window popup (for the minimalists)
+- `--no-sound` — Disable audio cues (for the library dwellers)
+
+The pomodoro plugin runs as a daemon in the background, so you can close your terminal and it'll keep ticking. It even plays sounds when breaks start and end. You're welcome.
+
+### 🖥️ Terminal UI
+
+For when you want to feel like a hacker managing your grocery list.
+
+```bash
+taiga tui run
+
+```
+
+Navigate with arrow keys, filter tasks, add new ones—all without leaving the terminal. It's like Vim, but for tasks. And less painful to exit.
+
+### Listing Plugins
+
+See what plugins you've got loaded:
+
+```bash
+taiga plugins
+
+```
+
 ---
 
 ## ⚙️ Under the Hood
@@ -130,6 +197,16 @@ Taiga stores your tasks in a simple Markdown file located in your system's defau
 * **Windows:** `%APPDATA%\taiginator\taiga.md`
 
 Because it's just a file, you can back it up with Git, sync it via Dropbox, or print it out and eat it.
+
+### Plugin Architecture
+
+Plugins live in `~/.config/taiga/plugins/` as dynamic libraries (`.so` on Linux, `.dylib` on Mac, `.dll` on Windows). The plugin API supports:
+
+- **Commands**: Add new subcommands to the CLI
+- **Daemon mode**: Long-running background processes with IPC
+- **Lifecycle hooks**: Run code on plugin load/unload
+
+Want to write your own plugin? Check out `taiga-plugin-api` crate and the existing plugins in `plugins/` for examples. Go wild.
 
 ## 🛠 Building & Contributing
 
